@@ -26,6 +26,7 @@ def Setup():
         Image = pygame.image.load(FileName)
         FishList.append(Fish(Image))
 
+    #SCREEN.fill((0,0,0))
     pygame.display.update()
 
 
@@ -64,6 +65,10 @@ class Fish:
         #魚を表示させる
         SCREEN.blit(self.Pic, (self.PosX, self.PosY))
 
+    #画面に表示する
+    def Display(self):
+        SCREEN.blit(self.Pic, (self.PosX, self.PosY))
+
     #前進
     def MoveForward(self):
         #直進
@@ -83,9 +88,6 @@ class Fish:
         self.PosX += (math.sin(math.radians(self.FrequencyCount)) * math.cos(math.radians(self.VarticalAngle))) * self.Amplitude
         self.PosY += (math.sin(math.radians(self.FrequencyCount)) * math.sin(math.radians(self.VarticalAngle))) * self.Amplitude
 
-        #
-        SCREEN.blit(self.Pic, (self.PosX, self.PosY))
-
         #カウントアップ
         self.FrequencyCount += self.Frequency
 
@@ -95,7 +97,17 @@ class Fish:
 Setup()
 
 while True:
-    LoopOut()
+    #画面のリセット
+    SCREEN.fill((0,0,0))
+
+    
     FishList[0].MoveForward()
+
+
+
+    #画面の更新とフレームレート制限
     pygame.display.update()
     clock.tick(24)
+
+    #ループ抜け処理
+    LoopOut()

@@ -67,7 +67,9 @@ class Fish:
 
         #その他メンバー関数に関するメンバー変数
         self.StartPos = [0,0]
-        self.EndPos = [0,0]
+        self.EndPos = [100,0]
+        self.TanEaseCount = 0
+        self.TanScale = 0
 
         #魚を表示させる
         SCREEN.blit(self.Pic, (self.PosX, self.PosY))
@@ -81,10 +83,37 @@ class Fish:
     #前進
     def MoveForward(self):
 
-        Between = round(math.sqrt((self.StartPos[0] - self.EndPos[0]) + (self.StartPos[1] - self.EndPos[1])), 2)
-        NowBetween = round(math.sqrt((self.PosX - self.EndPos[0]) + (self.PosY - self.EndPos[1])), 2)
+        Between = round(math.sqrt((self.StartPos[0] - self.EndPos[0]) ** 2 + (self.StartPos[1] - self.EndPos[1]) ** 2), 2)
+        NowBetween = round(math.sqrt((self.PosX - self.EndPos[0]) ** 2 + (self.PosY - self.EndPos[1]) ** 2), 2)
+
+
+        if self.TanEaseCount == 0:
+            self.TanEaseCount = 40
 
         #ここからNowBetweenが~って分岐をする
+        if NowBetween < Between * 0.9:
+            #End
+            print("End")
+            self.TanEaseCount += 1
+            if 0 < self.TanScale:
+                self.TanScale = math.fabs(1 - math.tan(math.radians(self.TanEaseCount)))
+            else:
+                self.TanScale = 0
+
+        elif  Between * 0.1 < NowBetween:
+            #Start
+            print("Start")
+            self.TanEaseCount += 1
+            if self.TanScale < self.SPEED:
+                self.TanScale = math.tan(math.radians(self.TanEaseCount))
+            else:
+                self.TanScale = 1
+        
+        else:
+            #Between
+            print("Between")
+            self.TanEaseCount = 0
+            self.TanScale = 1
 
         #直進
         self.PosX += math.cos(math.radians(self.Angle)) * self.SPEED

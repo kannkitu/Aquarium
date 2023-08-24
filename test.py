@@ -4,6 +4,7 @@ import pygame, pygame.locals
 #Pygameの初期化
 pygame.init()
 
+
 ########## 変数群 ##########
 
 #スクリーン
@@ -29,7 +30,12 @@ def Setup():
     #SCREEN.fill((0,0,0))
     pygame.display.update()
 
+#全てのFishを表示する
+def FishDisplay():
+    for item in FishList:
+        item.Display()
 
+#終了判定
 def LoopOut():
     #ループ抜け処理
     for event in pygame.event.get():
@@ -44,52 +50,59 @@ class Fish:
 
     #コンストラクタ
     def __init__(self, pic):
-        #メンバー変数(表示関連)の初期化
+        #基本的なメンバー変数
         self.PosX = 0
         self.PosY = 0
-
         self.Angle = 0
-        self.VarticalAngle = 90
+
+        #画像に関するメンバー変数
+        self.Pic = pic
         self.IsFacingRight = True
 
-        self.Speed = 10
-        self.Amplitude = 5  #振幅
-        self.Frequency = 10 #周波数
-        self.FrequencyCount = 0
+        #移動に関するメンバー変数
+        self.SPEED = 5          #速度
+        self.AMPLITUDE = 3      #振幅
+        self.FREQUENCY= 5       #周波数
+        self.FrequencyCount = 0 #Sin波のカウントアップ
 
-        self.Pic = pic
-
-        #メンバー変数(移動関連)の初期化
-        self.MoveCount = 0
+        #その他メンバー関数に関するメンバー変数
+        self.StartPos = [0,0]
+        self.EndPos = [0,0]
 
         #魚を表示させる
         SCREEN.blit(self.Pic, (self.PosX, self.PosY))
+
 
     #画面に表示する
     def Display(self):
         SCREEN.blit(self.Pic, (self.PosX, self.PosY))
 
+
     #前進
     def MoveForward(self):
-        #直進
-        self.PosX += math.cos(math.radians(self.Angle)) * self.Speed
-        self.PosY += math.sin(math.radians(self.Angle)) * self.Speed
 
-        print(self.PosX)
-        print(self.PosY)
+        Between = round(math.sqrt((self.StartPos[0] - self.EndPos[0]) + (self.StartPos[1] - self.EndPos[1])), 2)
+        NowBetween = round(math.sqrt((self.PosX - self.EndPos[0]) + (self.PosY - self.EndPos[1])), 2)
+
+        #ここからNowBetweenが~って分岐をする
+
+        #直進
+        self.PosX += math.cos(math.radians(self.Angle)) * self.SPEED
+        self.PosY += math.sin(math.radians(self.Angle)) * self.SPEED
 
         #画像に対して垂直の角度を取得
         if self.IsFacingRight:
-            self.VarticalAngle = self.Angle + 90 % 360
+            VarticalAngle = self.Angle + 90 % 360
         else:
-            self.VarticalAngle = self.Angle - 90
+            VarticalAngle = self.Angle - 90
 
         #Sin波
-        self.PosX += (math.sin(math.radians(self.FrequencyCount)) * math.cos(math.radians(self.VarticalAngle))) * self.Amplitude
-        self.PosY += (math.sin(math.radians(self.FrequencyCount)) * math.sin(math.radians(self.VarticalAngle))) * self.Amplitude
+        self.PosX += (math.sin(math.radians(self.FrequencyCount)) * math.cos(math.radians(VarticalAngle))) * self.AMPLITUDE
+        self.PosY += (math.sin(math.radians(self.FrequencyCount)) * math.sin(math.radians(VarticalAngle))) * self.AMPLITUDE
 
         #カウントアップ
-        self.FrequencyCount += self.Frequency
+        self.FrequencyCount += self.FREQUENCY
+
 
 ########## 実行 ##########
 
@@ -100,10 +113,12 @@ while True:
     #画面のリセット
     SCREEN.fill((0,0,0))
 
-    
+
     FishList[0].MoveForward()
 
 
+    #表示する
+    FishDisplay()
 
     #画面の更新とフレームレート制限
     pygame.display.update()

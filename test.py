@@ -4,11 +4,15 @@ import pygame, pygame.locals
 #Pygameの初期化
 pygame.init()
 
-
 ########## 変数群 ##########
 
 #スクリーン
-SCREEN = pygame.display.set_mode((1280, 720))
+Screen = pygame.display.set_mode((1280, 720))
+#スクリーンサイズ
+ScreenWidth = Screen.get_width()
+ScreenHeight = Screen.get_height()
+#ベゼル
+BEZEL = 200
 #初期の魚の数
 FISHNUM = 7
 #クラスFishが入る
@@ -28,7 +32,7 @@ def Setup():
         Image = pygame.image.load(FileName)
         FishList.append(Fish(Image))
 
-    #SCREEN.fill((0,0,0))
+    #Screen.fill((0,0,0))
     pygame.display.update()
 
 #全てのFishを表示する
@@ -45,7 +49,6 @@ def LoopOut():
             pygame.quit()
             exit()
 
-
 ########## クラス ##########
 
 class Fish:
@@ -55,7 +58,7 @@ class Fish:
         #基本的なメンバー変数
         self.PosX = 100
         self.PosY = 100
-        self.Angle = 0
+        self.Angle = 30
 
         #画像に関するメンバー変数
         self.Pic = pic
@@ -65,77 +68,106 @@ class Fish:
         self.SPEED = 5          #速度
         self.AMPLITUDE = 3      #振幅
         self.FREQUENCY= 5       #周波数
-        self.FrequencyCount = 0 #Sin波のカウントアップ
 
         #その他メンバー関数に関するメンバー変数
-        self.MF_SinEaseCount = 0
-        self.SinIncVal = 1
-        self.SinScale = 0
-        self.MaxSinScale = 0
+        self.MF_SinEaseCount = 0    
+        self.MF_FrequencyCount = 0  #Sin波のカウントアップ
+        self.MF_RemainingValue = 0  #残り移動量
+        self.MF_IsFirstTime = True  #初回かどうか
 
-        self.MF_RemainingValue = 0
-
-        self.CA_RemainingValue = 0
-        self.CA_IsFirstTime = True
+        self.QF_RemainingValue = 0
+        self.QF_IsFirstTime = True
 
         self.SA_RemainingValue = 0
         self.SA_IsFirstTime = True
 
+        self.QA_RemainingValue = 0
+        self.QA_IsFirstTime = True
+
+        #デバッグ用
+        self.DB_Scene = ""
+
         #魚を表示させる
-        SCREEN.blit(self.Pic, (self.PosX, self.PosY))
+        Screen.blit(self.Pic, (self.PosX, self.PosY))
 
 
     #画面に表示する
     def Display(self):
-        pic = pygame.transform.rotate(self.Pic, self.Angle)
+        #画面端移動
+        if ScreenWidth + BEZEL < self.PosX:
+            self.PosX = -BEZEL
+        elif self.PosX < 0 - BEZEL:
+            self.PosX = ScreenWidth + BEZEL
         
+        if ScreenHeight + BEZEL < self.PosY:
+            self.PosY = -BEZEL
+        elif self.PosY < 0 - BEZEL:
+            self.PosX = ScreenHeight + BEZEL
+
+        #画像の回転
+        pic = pygame.transform.rotate(self.Pic, self.Angle * -1)
         ImageRect = self.Pic.get_rect()
         CenterX = ImageRect.width // 2
         CenterY = ImageRect.height // 2
         RotatedRect = pic.get_rect(center=(self.PosX + CenterX, self.PosY + CenterY))
 
-        SCREEN.blit(pic, RotatedRect.topleft)
+        Screen.blit(pic, RotatedRect.topleft)
 
 
     #前進
     def MoveForward(self, distance):
 
+        #一回きりの処理
+        if self.MF_IsFirstTime:
+            self.MF_SinEaseCount = 0
+            self.MF_RemainingValue = distance
+            self.MF_IsFirstTime = False
+
         DBScene = "null"
         SinIncVal = 90 / (FLAMELATE * 2)
         
-        if self.MF_SinEaseCount == 0:
-            self.MF_RemainingValue = distance
-
-        #速度に掛ける"SinIncVal"を設定
+        #速度に掛ける"SinIncVal"の設定とアーリーリターン
         if distance * 0.9 < self.MF_RemainingValue:
             #Start
-            DBScene = "Start"
+            self.DB_Scene = "MoveForward_Start"
+
             self.MF_SinEaseCount += SinIncVal
             if self.MF_SinEaseCount <= 90:
-                self.SinScale = round(math.sin(math.radians(self.MF_SinEaseCount)), 2)
+                SinScale = round(math.sin(math.radians(self.MF_SinEaseCount)), 2)
+            else:
+                SinScale = 1
+
         elif self.MF_RemainingValue < distance * 0.1:
             #End
-            DBScene = "End"
+            self.DB_Scene = "MoveForward_End"
+
             self.MF_SinEaseCount += SinIncVal
             if self.MF_SinEaseCount <= 180:
-                self.SinScale = round(math.sin(math.radians(self.MF_SinEaseCount)), 2)
+                SinScale = round(math.sin(math.radians(self.MF_SinEaseCount)), 2)
+            #アーリーリターン
+            else:
+                self.MF_IsFirstTime = True
+                return False
+
         else:
             #Between
-            DBScene = "Between"
-            self.MF_SinEaseCount = 90
-            self.SinScale = 1
+            self.DB_Scene = "MoveForward_Normal"
 
-        print("DBScene = " + DBScene + " | SinScale = " + str(self.SinScale) + " | MF_SinEaseCount = " + str(self.MF_SinEaseCount) + " | NowDistance" + str(self.MF_RemainingValue) + " | Distance" + str(distance))
+            self.MF_SinEaseCount = 90
+            SinScale = 1
+        
+
+        print("DBScene = " + DBScene + " | SinScale = " + str(SinScale) + " | MF_SinEaseCount = " + str(self.MF_SinEaseCount) + " | NowDistance" + str(self.MF_RemainingValue) + " | Distance" + str(distance))
 
         #移動先の座標を決定する
         #直進
-        XIncreace = math.cos(math.radians(self.Angle)) * self.SPEED * self.SinScale
-        YIncreace = math.sin(math.radians(self.Angle)) * self.SPEED * self.SinScale
+        XIncreace = math.cos(math.radians(self.Angle)) * self.SPEED * SinScale
+        YIncreace = math.sin(math.radians(self.Angle)) * self.SPEED * SinScale
         self.PosX += XIncreace
         self.PosY += YIncreace
 
         #MF_RemainingValueの更新
-        self.MF_RemainingValue = self.MF_RemainingValue - math.sqrt(XIncreace ** 2 + YIncreace ** 2)
+        self.MF_RemainingValue -= round(math.sqrt(XIncreace ** 2 + YIncreace ** 2), 2)
         
         #画像に対して垂直の角度を取得
         if self.IsFacingRight:
@@ -144,15 +176,54 @@ class Fish:
             VarticalAngle = self.Angle - 90
 
         #Sin波
-        self.PosX += (math.sin(math.radians(self.FrequencyCount)) * math.cos(math.radians(VarticalAngle))) * self.AMPLITUDE * self.SinScale
-        self.PosY += (math.sin(math.radians(self.FrequencyCount)) * math.sin(math.radians(VarticalAngle))) * self.AMPLITUDE * self.SinScale
+        self.PosX += (math.sin(math.radians(self.MF_FrequencyCount)) * math.cos(math.radians(VarticalAngle))) * self.AMPLITUDE * SinScale
+        self.PosY += (math.sin(math.radians(self.MF_FrequencyCount)) * math.sin(math.radians(VarticalAngle))) * self.AMPLITUDE * SinScale
 
         #カウントアップ
-        self.FrequencyCount += self.FREQUENCY
+        self.MF_FrequencyCount += self.FREQUENCY
 
         return True
 
-    def SuddenAngleChange(self, angle):
+
+    def QuickMoveForward(self, distance):
+
+        if self.QF_IsFirstTime:
+            self.QF_RemainingValue = distance
+            self.QF_IsFirstTime = False
+
+        #Endアーリーリターン
+        if self.QF_RemainingValue < 1:
+            return False
+        
+        #Move
+        IncreaceValue = self.QF_RemainingValue / 5.5
+        self.PosX += IncreaceValue * math.cos(math.radians(self.Angle))
+        self.PosY += IncreaceValue * math.sin(math.radians(self.Angle))
+        self.QF_RemainingValue -= IncreaceValue
+        
+        return True
+
+    def QuickAngleChange(self, angle):
+
+        if self.QA_IsFirstTime:
+            self.QA_RemainingValue = angle
+            self.QA_IsFirstTime = False
+
+        if abs(self.QA_RemainingValue) < 1:
+            self.QA_RemainingValue = 0
+            self.QA_IsFirstTime = True
+            return False
+        
+        IncreaceValue = self.QA_RemainingValue / 4
+        self.Angle += IncreaceValue
+        self.QA_RemainingValue -= IncreaceValue
+
+        print(self.QA_RemainingValue)
+        
+        return True
+        
+
+    def SlowAngleChange(self, angle):
 
         if self.SA_IsFirstTime:
             self.SA_RemainingValue = angle
@@ -163,29 +234,15 @@ class Fish:
             self.SA_IsFirstTime = True
             return False
         
-        IncreaceValue = self.SA_RemainingValue / 4
+        IncreaceValue = angle / abs(angle) * 2
         self.Angle += IncreaceValue
         self.SA_RemainingValue -= IncreaceValue
 
-        print(self.SA_RemainingValue)
-        
-        return True
-        
-
-    def ConstantAngleChange(self, angle):
-
-        if self.CA_IsFirstTime:
-            self.CA_RemainingValue = angle
-            self.CA_IsFirstTime = False
-
-        if abs(self.CA_RemainingValue) < 1:
-            self.CA_RemainingValue = 0
-            self.CA_IsFirstTime = True
-            return False
-        
-        IncreaceValue = angle / abs(angle) * 2
-        self.Angle += IncreaceValue
-        self.CA_RemainingValue -= IncreaceValue
+        #直進
+        XIncreace = math.cos(math.radians(self.Angle)) * self.SPEED
+        YIncreace = math.sin(math.radians(self.Angle)) * self.SPEED
+        self.PosX += XIncreace
+        self.PosY += YIncreace
         
         return True
 
@@ -197,10 +254,10 @@ Setup()
 
 while True:
     #画面のリセット
-    SCREEN.fill((0,0,0))
+    Screen.fill((0,0,0))
 
 
-    FishList[0].SuddenAngleChange(180)
+    FishList[0].MoveForward(2000)
 
 
     #表示する

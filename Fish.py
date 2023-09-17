@@ -16,6 +16,7 @@ ScreenHeight = Screen.get_height()
 BackPic = None
 BackPicList = []
 BackFlame = 1
+blitCounter = 0
 #泡
 BubbleList = []
 BublePic = None

@@ -1,6 +1,8 @@
-import random, math, os, numpy, cv2
+import random, math, os, cv2
 from PIL import Image
 import pygame, pygame.locals
+from folder_observer import start_directory_watch
+import threading
 
 #Pygameの初期化
 pygame.init()
@@ -32,17 +34,36 @@ FLAMELATE = 20
 
 Kani = None
 
+FISH_DIRECTRY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fishs")
+
 
 ########## 関数群 ##########
+def start_observer(callback) -> None:
+    watcher_thread = threading.Thread(target=start_directory_watch, args=(callback,))
+    watcher_thread.daemon = True
+    watcher_thread.start()
+
+def make_fish_list():
+    """
+    画像のリロードを行い、FishListに入れるためのデータの作成を行う。
+    Returns:
+        list: FishListに追加する
+    """
+    new_fish_list = []
+    entries = os.listdir(FISH_DIRECTRY)
+    for entry in entries:
+        file_path = os.path.join(FISH_DIRECTRY, entry)
+        image = cv2.imread(file_path)
+        if image is not None:
+            new_fish_list.append(Fish(image, False))
+
+    global FishList
+    FishList = new_fish_list
 
 #初期セットアップを行う関数
 def Setup():
-    #初期の魚を読み込む処理
-    for i in range(FISHNUM):
-        FileName = os.path.join(os.path.dirname(os.path.abspath(__file__)), "resource", str(i) + ".png")
-        ImageObj = cv2.imread(FileName)
-        if ImageObj is not None:
-            FishList.append(Fish(ImageObj, False))
+    start_observer(make_fish_list)
+    make_fish_list()
 
     #背景gifに関する処理
     global BackPic, BackPicList
@@ -63,6 +84,7 @@ def Setup():
     Kani = Fish(KaniPic, True)
 
     pygame.display.update()
+
     return
 
 def BackDisplay():
@@ -80,12 +102,18 @@ def BackDisplay():
         BackFlame = 1
 
 def Buble():
+    NewBubbleList = []
     for item in BubbleList:
-        item.move()
-        item.draw()
+        if not item.checkDel():
+            item.draw()
+            item.move()
+            NewBubbleList.append(item)
+            
+    BubbleList[:] = NewBubbleList
     
     if random.randrange(0,4) == 0:
         BubbleList.append(Bubble())
+
 
 #全てのFishを表示する
 def FishDisplay():
@@ -115,7 +143,6 @@ class Bubble:
         self.angle = random.uniform(-1.1, 1.1)  # 左右にランダムな角度で揺れる
         self.direction_change_prob = 0.4  # 方向転換の確率
         self.frame_count = 0  # フレームカウント
-        
 
     def move(self):
         self.y -= self.speed
@@ -129,10 +156,14 @@ class Bubble:
             self.Siz -= 1
 
     def draw(self):
-        if self.Siz < 0 or self.y < -20:
-            return
         Pic = pygame.transform.scale(self.Pic, (self.Siz, self.Siz))
         Screen.blit(Pic, (self.x, self.y))
+    
+    def checkDel(self):
+        if self.Siz < 0 or self.y < -20:
+            return True
+        else:
+            return False
 
 class Fish:
 
@@ -203,78 +234,6 @@ class Fish:
                 self.PosY = -BEZEL
             elif self.PosY < 0 - BEZEL:
                 self.PosY = ScreenHeight + BEZEL
-
-        def ProjectiveTF(pic):
-            #射影変換
-            #画像を分割
-            FinPic = pic[:, :40]
-            BodyPic = pic[:, 40:]
-
-            #画像の変数
-            FinWidth = FinPic.shape[1]
-            FinHeight = FinPic.shape[0]
-
-            #尾ひれの終点X,Yを設定
-            if self.Fin_Count < 40:
-                #奥→手前
-                self.Fin_TargetTY -= 1
-                self.Fin_TargetBY += 1
-                if self.Fin_Count < 20:
-                    self.Fin_TargetX += 1
-                else:
-                    self.Fin_TargetX -= 1
-            else:
-                #手前→奥
-                self.Fin_TargetTY += 1
-                self.Fin_TargetBY -= 1
-                if self.Fin_Count < 60:
-                    self.Fin_TargetX += 1
-                else:
-                    self.Fin_TargetX -= 1
-            self.Fin_Count += 1
-            self.Fin_Count = self.Fin_Count % 80
-            
-
-            #マトリックスの作成
-            BP1 = [0, 0]
-            BP2 = [FinWidth, 0]
-            BP3 = [0, FinHeight]
-            BP4 = [FinWidth, FinHeight]
-            AP1 = [self.Fin_TargetX, self.Fin_TargetTY]
-            AP2 = BP2
-            AP3 = [self.Fin_TargetX, self.Fin_TargetBY]
-            AP4 = BP4
-            BeforePoint = numpy.float32((BP1, BP2, BP3, BP4))
-            AfterPoint = numpy.float32((AP1, AP2, AP3, AP4))
-            Matrix = cv2.getPerspectiveTransform(BeforePoint, AfterPoint)
-
-            #画像の変形
-            TransWidth = FinWidth - self.Fin_TargetX
-            TransHeigth = self.Fin_TargetBY - self.Fin_TargetTY
-            if TransHeigth < FinHeight:
-                TransHeigth = FinHeight
-            ArrayPic = cv2.warpPerspective(FinPic, Matrix, (TransHeigth, TransWidth))
-
-            def pad_image_center(img, target_height):
-                # 上下に追加するパディングの高さを計算
-                pad_top = (target_height - img.shape[0]) // 2
-                pad_bottom = target_height - img.shape[0] - pad_top
-                
-                # 画像に上下のパディングを追加
-                padded_img = cv2.copyMakeBorder(img, pad_top, pad_bottom, 0, 0, cv2.BORDER_CONSTANT, value=[0, 0, 0])
-                return padded_img
-
-            # 最大の高さを取得
-            max_height = max(ArrayPic.shape[0], BodyPic.shape[0])
-
-            # 画像の高さを最大の高さに合わせる
-            ArrayPic = pad_image_center(ArrayPic, max_height)
-            BodyPic = pad_image_center(BodyPic, max_height)
-
-            #画像をくっつける
-            ArrayPic = cv2.hconcat([ArrayPic, BodyPic])
-            print("Top = " + str(TransWidth) + "Buttom" + str(TransHeigth))
-            return ArrayPic
         
         def make_black_transparent_for_pygame(cv2_img):
             ##00000部分を透過処理し、Pygameで読み込みが可能な形式に変更する by ChatGPT
@@ -290,7 +249,7 @@ class Fish:
             
             # Numpy arrayからpygameのサーフェスに変換
             height, width = cv2_img.shape[:2]
-            pygame_img = pygame.image.fromstring(cv2_img.tostring(), (width, height), 'RGBA')
+            pygame_img = pygame.image.fromstring(cv2_img.tobytes(), (width, height), 'RGBA')
 
             return pygame_img
         
@@ -636,7 +595,7 @@ while True:
     #表示する
     BackDisplay()
     FishDisplay()
-    kani()
+    #kani()
     Buble()
     
     #test()
